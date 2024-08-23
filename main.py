@@ -11,11 +11,16 @@ from typing import Optional
 import numpy as np
 import uvicorn
 import whisper
+import faster_whisper
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+import time
+import copy
 
 app = FastAPI()
+
+MODEL_NAME = "large-v3"
 
 origins = ["*"]
 
@@ -32,6 +37,16 @@ app.add_middleware(
 def get_whisper_model(whisper_model: str):
     """Get a whisper model from the cache or download it if it doesn't exist"""
     model = whisper.load_model(whisper_model)
+
+    return model
+
+@lru_cache(maxsize=1)
+def get_faster_whisper_model(whisper_model: str):
+    """Get a whisper model from the cache or download it if it doesn't exist"""
+    model_size = MODEL_NAME
+    device, compute_type = "cuda", "float16"
+    model = faster_whisper.WhisperModel(model_size, device=device, compute_type=compute_type)
+
     return model
 
 
@@ -64,8 +79,38 @@ def transcribe(audio_path: str, whisper_model: str, **whisper_args):
     return transcript
 
 
+def faster_transcribe(audio_path :str):
+    model = get_faster_whisper_model(MODEL_NAME)
+    try:
+        stime = time.time()
+        segments, info = model.transcribe(
+            audio_path, 
+            word_timestamps=False,
+            vad_filter=True,
+            temperature=0,
+            language=None,
+            initial_prompt=None,
+        )
+        print("推理耗时（秒） ", time.time() - stime)
+        print("输入语音长度 %0.3f 秒，猜测语言 %s（概率 %0.3f)" % (info.duration, info.language, info.language_probability))
+        
+        # debugSegments = copy.deepcopy(segments)
+        # for s in debugSegments:
+        #     print(s)
+
+    except ValueError as e:
+        # 没有识别到语言的时候可能会报 ValueError: max() arg is an empty sequence
+        # 进行没有识别到语言的处理
+        print("本次没有识别到文字")
+        return []
+
+    return segments
+
+
+
 WHISPER_DEFAULT_SETTINGS = {
-    "whisper_model": "base",
+    #"whisper_model": "base",
+    "whisper_model": MODEL_NAME,
     "temperature": 0.0,
     "temperature_increment_on_fallback": 0.2,
     "no_speech_threshold": 0.6,
@@ -123,7 +168,13 @@ async def transcriptions(
     if settings_override is not None:
         whisper_args.update(settings_override)
 
-    transcript = transcribe(audio_path=upload_name, **whisper_args)
+    # 普通 whisper
+    # transcript = transcribe(audio_path=upload_name, **whisper_args)
+    # return transcript
+
+    # faster_whisper
+    result = faster_transcribe(audio_path=upload_name)
+    return result
 
     if response_format in ["text"]:
         return transcript["text"]
