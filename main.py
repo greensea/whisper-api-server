@@ -91,9 +91,8 @@ def faster_transcribe(audio_path :str):
             language=None,
             initial_prompt=None,
         )
-        print("推理耗时（秒） ", time.time() - stime)
-        print("输入语音长度 %0.3f 秒，猜测语言 %s（概率 %0.3f)" % (info.duration, info.language, info.language_probability))
-        
+        print("推理耗时 %0.3f 秒，输入语音长度 %0.3f 秒，猜测语言 %s（概率 %0.3f)" % (time.time() - stime, info.duration, info.language, info.language_probability))
+        # print("本次识别到的文字: %s" % segments)
         # debugSegments = copy.deepcopy(segments)
         # for s in debugSegments:
         #     print(s)
@@ -101,7 +100,8 @@ def faster_transcribe(audio_path :str):
     except ValueError as e:
         # 没有识别到语言的时候可能会报 ValueError: max() arg is an empty sequence
         # 进行没有识别到语言的处理
-        print("本次没有识别到文字")
+        # print("输入语音长度 %0.3f 秒，本次没有识别到文字: %s" % (info.duration, str(e)))
+        print("本次没有识别到文字: %s" % str(e))
         return []
 
     return segments
