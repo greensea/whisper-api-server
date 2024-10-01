@@ -170,7 +170,7 @@ async def transcriptions(
         if tsStr.isdigit():
             ts = int(tsStr)
 
-        if time.time() - ts > 6000:
+        if time.time() - ts > 60:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 时间戳超出范围"
             )
