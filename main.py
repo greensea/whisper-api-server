@@ -106,7 +106,11 @@ def faster_transcribe(audio_path :str):
         print("本次没有识别到文字: %s" % str(e))
         return []
 
-    return segments
+    return {
+        "segments": segments,
+        "info": info,
+        "inference_time": time.time() - stime,
+    }   
 
 
 
