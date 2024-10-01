@@ -6,13 +6,15 @@ import os
 import shutil
 from datetime import timedelta
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Annotated
+
+
 
 import numpy as np
 import uvicorn
 import whisper
 import faster_whisper
-from fastapi import FastAPI, Form, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File, Header
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import time
@@ -123,6 +125,8 @@ WHISPER_DEFAULT_SETTINGS = {
 
 UPLOAD_DIR = "tmp"
 
+import hmac
+import hashlib
 
 @app.post("/v1/audio/transcriptions")
 async def transcriptions(
@@ -131,8 +135,53 @@ async def transcriptions(
     response_format: Optional[str] = Form(None),
     temperature: Optional[float] = Form(None),
     settings_override: Optional[dict] = Form(None),
+    authorization: Annotated[str , Header()] = "",
 ):
     assert model == "whisper-1"
+
+    # 进行认证检查
+    # 获取 Authorization 头
+    # 其结构是: Authorization: 1234567890.abcdef12354xxxxxxx
+    # 其中 1234567890 是时间戳，abcdef12345 是 HAMC_SHA256(1234567890, KIWI_API_KEY)
+    # KIWI_API_KEY 由环境变量提供
+    KIWI_API_KEY = os.getenv("KIWI_API_KEY")
+    if KIWI_API_KEY is None:
+        print("未设置 KIWI_API_KEY，不会执行 API 认证检查")
+    else:
+        print("获取到 Authorization 是", authorization)
+
+        if authorization == "":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 未提供 Authorization 头"
+            )
+
+        auths = authorization.split(".")
+        if len(auths) != 2:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 签名格式错误"
+            )
+
+        tsStr = auths[0]
+        ts = 0
+        if tsStr.isdigit():
+            ts = int(tsStr)
+
+        if time.time() - ts > 6000:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 时间戳超出范围"
+            )
+        
+        theirSign = auths[1]
+        ourSign = hmac.new(KIWI_API_KEY.encode(), tsStr.encode(), hashlib.sha256).hexdigest()
+        if theirSign != ourSign:
+            print("我方 KEY: `%s'" % KIWI_API_KEY)
+            print("我方 sign: ", ourSign)
+            print("对方 sign: ", theirSign)
+            print("我方数据: `%s'" % tsStr)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 签名不正确"
+            )
+        
 
     if file is None:
         raise HTTPException(
