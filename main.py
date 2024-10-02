@@ -174,7 +174,7 @@ def test_serialization(segments):
     # 测试所有字段一起序列化
     start_time = time.time()
     try:
-        dumps(
+        json.dumps(
             [{f: getattr(segment, f, None) for f in fields} for segment in segments], 
             ensure_ascii = False,
             allow_nan = True,
@@ -287,7 +287,7 @@ async def transcriptions(
     # faster_whisper
     result = faster_transcribe(audio_path=upload_name)
     stime = time.time()
-    resultJ = dumps(
+    resultJ = json.dumps(
         result,
         iterable_as_array = True,
         ensure_ascii = False,
