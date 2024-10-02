@@ -269,6 +269,7 @@ async def transcriptions(
     result = faster_transcribe(audio_path=upload_name)
     resultJ = dumps(
         result,
+        iterable_as_array = True,
         ensure_ascii = False,
         allow_nan = True,
         indent = None,
