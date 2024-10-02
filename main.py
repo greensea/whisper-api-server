@@ -115,6 +115,12 @@ def faster_transcribe(audio_path :str):
     }   
 
 def test_serialization(segments):
+    # 在其他代码之前添加这些行
+    sample_segment = next(iter(segments), None)
+    if sample_segment:
+        print(f"'start' 字段的类型: {type(sample_segment.start)}")
+        print(f"'start' 字段的值: {sample_segment.start}")
+
     fields = ['start', 'end', 'text', 'words', 'tokens', 'avg_logprob', 'compression_ratio', 'no_speech_prob']
     
     for field in fields:
