@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import Optional, Annotated
 import simplejson as json
 
+
 import hmac
 import hashlib
 
@@ -45,6 +46,7 @@ WHISPER_DEFAULT_SETTINGS = {
 # 开始初始各种类重载
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
+        print("obj", obj)
         if isinstance(obj, float):
             if obj == float('inf') or obj == -float('inf'):
                 return 0  # 或者返回其他你想要的值，比如 0
@@ -52,6 +54,8 @@ class CustomJSONEncoder(json.JSONEncoder):
                 return 0  # 或者返回其他你想要的值，比如 0
         return super().default(obj)
     
+
+
 
 # 开始初始化服务器配置
 
@@ -161,7 +165,7 @@ def test_serialization(segments):
             json.dumps(
                 [{field: getattr(segment, field, None)} for segment in segments], 
                 ensure_ascii = False,
-                allow_nan = True,
+                ignore_nan = True,
                 indent = None,
                 separators = (',', ':'),
                 cls = CustomJSONEncoder,
@@ -177,7 +181,7 @@ def test_serialization(segments):
         json.dumps(
             [{f: getattr(segment, f, None) for f in fields} for segment in segments], 
             ensure_ascii = False,
-            allow_nan = True,
+            ignore_nan = True,
             indent = None,
             separators = (',', ':'),
             cls = CustomJSONEncoder,
@@ -291,7 +295,7 @@ async def transcriptions(
         result,
         iterable_as_array = True,
         ensure_ascii = False,
-        allow_nan = True,
+        ignore_nan = True,
         indent = None,
         separators = (',', ':'),
         cls = CustomJSONEncoder,
