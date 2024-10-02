@@ -14,7 +14,6 @@ from simplejson import dumps
 import hmac
 import hashlib
 
-
 import numpy as np
 import uvicorn
 import whisper
@@ -23,6 +22,20 @@ from fastapi import FastAPI, Form, UploadFile, File, Header, Response
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import time
+
+
+WHISPER_DEFAULT_SETTINGS = {
+    #"whisper_model": "base",
+    "whisper_model": MODEL_NAME,
+    "temperature": 0.0,
+    "temperature_increment_on_fallback": 0.2,
+    "no_speech_threshold": 0.6,
+    "logprob_threshold": -1.0,
+    "compression_ratio_threshold": 2.4,
+    "condition_on_previous_text": True,
+    "verbose": False,
+    "task": "transcribe",
+}
 
 
 app = FastAPI()
@@ -111,7 +124,7 @@ def faster_transcribe(audio_path :str):
         print("本次没有识别到文字: %s" % str(e))
         return []
 
-    test_serialization(segments)
+    # test_serialization(segments)
 
     return {
         "segments": segments,
@@ -159,18 +172,6 @@ def test_serialization(segments):
         print(f"所有字段一起序列化失败: {str(e)}")
 
 
-WHISPER_DEFAULT_SETTINGS = {
-    #"whisper_model": "base",
-    "whisper_model": MODEL_NAME,
-    "temperature": 0.0,
-    "temperature_increment_on_fallback": 0.2,
-    "no_speech_threshold": 0.6,
-    "logprob_threshold": -1.0,
-    "compression_ratio_threshold": 2.4,
-    "condition_on_previous_text": True,
-    "verbose": False,
-    "task": "transcribe",
-}
 
 
 
@@ -278,7 +279,7 @@ async def transcriptions(
         indent = None,
         separators = (',', ':'),
     ).encode("utf-8")
-    print("序列化耗时: %0.3f 秒" % (time.time() - stime))
+    # print("序列化耗时: %0.3f 秒" % (time.time() - stime))
 
 
                          
