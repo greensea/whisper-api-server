@@ -2,12 +2,17 @@
 Based on https://github.com/morioka/tiny-openai-whisper-api
 """
 
+UPLOAD_DIR = "tmp"
+
 import os
 import shutil
 from datetime import timedelta
 from functools import lru_cache
 from typing import Optional, Annotated
 from simplejson import dumps
+
+import hmac
+import hashlib
 
 
 import numpy as np
@@ -167,10 +172,7 @@ WHISPER_DEFAULT_SETTINGS = {
     "task": "transcribe",
 }
 
-UPLOAD_DIR = "tmp"
 
-import hmac
-import hashlib
 
 @app.post("/v1/audio/transcriptions")
 async def transcriptions(
@@ -267,6 +269,7 @@ async def transcriptions(
 
     # faster_whisper
     result = faster_transcribe(audio_path=upload_name)
+    stime = time.time()
     resultJ = dumps(
         result,
         iterable_as_array = True,
@@ -275,6 +278,8 @@ async def transcriptions(
         indent = None,
         separators = (',', ':'),
     ).encode("utf-8")
+    print("序列化耗时: %0.3f 秒" % (time.time() - stime))
+
 
                          
     return Response(resultJ, media_type="application/json")
