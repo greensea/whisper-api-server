@@ -7,7 +7,7 @@ import shutil
 from datetime import timedelta
 from functools import lru_cache
 from typing import Optional, Annotated
-from json import dumps
+from simplejson import dumps
 
 
 import numpy as np
@@ -106,12 +106,34 @@ def faster_transcribe(audio_path :str):
         print("本次没有识别到文字: %s" % str(e))
         return []
 
+    test_serialization(segments)
+
     return {
         "segments": segments,
         "info": info,
         "inference_time": time.time() - stime,
     }   
 
+def test_serialization(segments):
+    fields = ['start', 'end', 'text', 'words', 'tokens', 'avg_logprob', 'compression_ratio', 'no_speech_prob']
+    
+    for field in fields:
+        start_time = time.time()
+        try:
+            json.dumps([{field: getattr(segment, field, None)} for segment in segments])
+            end_time = time.time()
+            print(f"字段 '{field}' 序列化耗时: {end_time - start_time:.4f} 秒")
+        except Exception as e:
+            print(f"字段 '{field}' 序列化失败: {str(e)}")
+
+    # 测试所有字段一起序列化
+    start_time = time.time()
+    try:
+        json.dumps([{f: getattr(segment, f, None) for f in fields} for segment in segments])
+        end_time = time.time()
+        print(f"所有字段一起序列化耗时: {end_time - start_time:.4f} 秒")
+    except Exception as e:
+        print(f"所有字段一起序列化失败: {str(e)}")
 
 
 WHISPER_DEFAULT_SETTINGS = {
@@ -229,7 +251,7 @@ async def transcriptions(
     result = faster_transcribe(audio_path=upload_name)
     resultJ = dumps(
         result,
-        iensure_ascii = False,
+        ensure_ascii = False,
         allow_nan = True,
         indent = None,
         separators = (',', ':'),
