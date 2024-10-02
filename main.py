@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import time
 
 
+MODEL_NAME = "large-v3"
+
 WHISPER_DEFAULT_SETTINGS = {
     #"whisper_model": "base",
     "whisper_model": MODEL_NAME,
@@ -40,13 +42,9 @@ WHISPER_DEFAULT_SETTINGS = {
 
 app = FastAPI()
 
-MODEL_NAME = "large-v3"
-
-origins = ["*"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -177,14 +175,14 @@ def test_serialization(segments):
 
 @app.post("/v1/audio/transcriptions")
 async def transcriptions(
-    model: str = Form(...),
+    # model: str = Form(...),
     file: UploadFile = File(...),
     response_format: Optional[str] = Form(None),
     temperature: Optional[float] = Form(None),
     settings_override: Optional[dict] = Form(None),
     authorization: Annotated[str , Header()] = "",
 ):
-    assert model == "whisper-1"
+    # assert model == "whisper-1"
 
     # 进行认证检查
     # 获取 Authorization 头
