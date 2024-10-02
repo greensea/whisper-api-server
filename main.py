@@ -120,7 +120,13 @@ def test_serialization(segments):
     for field in fields:
         start_time = time.time()
         try:
-            json.dumps([{field: getattr(segment, field, None)} for segment in segments])
+            dumps(
+                [{field: getattr(segment, field, None)} for segment in segments], 
+                ensure_ascii = False,
+                allow_nan = True,
+                indent = None,
+                separators = (',', ':'),
+            )
             end_time = time.time()
             print(f"字段 '{field}' 序列化耗时: {end_time - start_time:.4f} 秒")
         except Exception as e:
@@ -129,7 +135,13 @@ def test_serialization(segments):
     # 测试所有字段一起序列化
     start_time = time.time()
     try:
-        json.dumps([{f: getattr(segment, f, None) for f in fields} for segment in segments])
+        dumps(
+            [{f: getattr(segment, f, None) for f in fields} for segment in segments], 
+            ensure_ascii = False,
+            allow_nan = True,
+            indent = None,
+            separators = (',', ':'),
+        )
         end_time = time.time()
         print(f"所有字段一起序列化耗时: {end_time - start_time:.4f} 秒")
     except Exception as e:
