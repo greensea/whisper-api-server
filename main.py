@@ -9,7 +9,7 @@ import shutil
 from datetime import timedelta
 from functools import lru_cache
 from typing import Optional, Annotated
-from simplejson import dumps
+import simplejson as json
 
 import hmac
 import hashlib
@@ -23,6 +23,8 @@ from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import time
 
+
+# 开始基础配置
 
 MODEL_NAME = "large-v3"
 
@@ -38,6 +40,20 @@ WHISPER_DEFAULT_SETTINGS = {
     "verbose": False,
     "task": "transcribe",
 }
+
+
+# 开始初始各种类重载
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, float):
+            if obj == float('inf') or obj == -float('inf'):
+                return 0  # 或者返回其他你想要的值，比如 0
+            elif obj != obj:  # 检查 NaN
+                return 0  # 或者返回其他你想要的值，比如 0
+        return super().default(obj)
+    
+
+# 开始初始化服务器配置
 
 
 app = FastAPI()
@@ -142,12 +158,13 @@ def test_serialization(segments):
     for field in fields:
         start_time = time.time()
         try:
-            dumps(
+            json.dumps(
                 [{field: getattr(segment, field, None)} for segment in segments], 
                 ensure_ascii = False,
                 allow_nan = True,
                 indent = None,
                 separators = (',', ':'),
+                cls = CustomJSONEncoder,
             )
             end_time = time.time()
             print(f"字段 '{field}' 序列化耗时: {end_time - start_time:.4f} 秒")
@@ -163,6 +180,7 @@ def test_serialization(segments):
             allow_nan = True,
             indent = None,
             separators = (',', ':'),
+            cls = CustomJSONEncoder,
         )
         end_time = time.time()
         print(f"所有字段一起序列化耗时: {end_time - start_time:.4f} 秒")
@@ -276,6 +294,7 @@ async def transcriptions(
         allow_nan = True,
         indent = None,
         separators = (',', ':'),
+        cls = CustomJSONEncoder,
     ).encode("utf-8")
     # print("序列化耗时: %0.3f 秒" % (time.time() - stime))
 
