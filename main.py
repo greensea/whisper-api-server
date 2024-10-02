@@ -7,18 +7,18 @@ import shutil
 from datetime import timedelta
 from functools import lru_cache
 from typing import Optional, Annotated
-
+from json import dumps
 
 
 import numpy as np
 import uvicorn
 import whisper
 import faster_whisper
-from fastapi import FastAPI, Form, UploadFile, File, Header
+from fastapi import FastAPI, Form, UploadFile, File, Header, Response
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import time
-import copy
+
 
 app = FastAPI()
 
@@ -227,7 +227,16 @@ async def transcriptions(
 
     # faster_whisper
     result = faster_transcribe(audio_path=upload_name)
-    return result
+    resultJ = dumps(
+        result,
+        iensure_ascii = False,
+        allow_nan = True,
+        indent = None,
+        separators = (',', ':'),
+    ).encode("utf-8")
+
+                         
+    return Response(resultJ, media_type="application/json")
 
     if response_format in ["text"]:
         return transcript["text"]
