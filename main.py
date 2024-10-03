@@ -10,6 +10,7 @@ from datetime import timedelta
 from functools import lru_cache
 from typing import Optional, Annotated
 import simplejson as json
+from pynvml import *
 
 
 import hmac
@@ -70,6 +71,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@lru_cache(maxsize=1)
+def get_gpu_name():
+    nvmlInit()
+    ret = []
+    for i in range(nvmlDeviceGetCount()):
+        handle = nvmlDeviceGetHandleByIndex(i)
+        ret.append(nvmlDeviceGetName(handle))
+    nvmlShutdown()
+    return ret
 
 @lru_cache(maxsize=1)
 def get_whisper_model(whisper_model: str):
@@ -148,6 +158,7 @@ def faster_transcribe(audio_path :str):
         "segments": segments,
         "info": info,
         "inference_time": time.time() - stime,
+        "gpus": get_gpu_name(),
     }   
 
 def test_serialization(segments):
