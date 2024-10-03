@@ -252,10 +252,10 @@ async def transcriptions(
         theirSign = auths[1]
         ourSign = hmac.new(KIWI_API_KEY.encode(), tsStr.encode(), hashlib.sha256).hexdigest()
         if theirSign != ourSign:
-            print("我方 KEY: `%s'" % KIWI_API_KEY)
-            print("我方 sign: ", ourSign)
-            print("对方 sign: ", theirSign)
-            print("我方数据: `%s'" % tsStr)
+            # print("我方 KEY: `%s'" % KIWI_API_KEY)
+            # print("我方 sign: ", ourSign)
+            # print("对方 sign: ", theirSign)
+            # print("我方数据: `%s'" % tsStr)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 签名不正确"
             )
