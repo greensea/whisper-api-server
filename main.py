@@ -24,6 +24,10 @@ from fastapi import FastAPI, Form, UploadFile, File, Header, Response
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import time
+import inspect
+
+
+
 
 
 # 开始基础配置
@@ -70,6 +74,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# from pyinstrument import Profiler
+# from fastapi import Request
+# from fastapi.responses import HTMLResponse
+
+# @app.middleware("http")
+# async def profile_request(request: Request, call_next):
+#     profiling = request.query_params.get("profile", False)
+#     if profiling:
+#         profiler = Profiler(interval=0.01, async_mode="enabled")
+#         profiler.start()
+#         await call_next(request)
+#         profiler.stop()
+#         return HTMLResponse(profiler.output_html())
+#     else:
+#         return await call_next(request)
 
 @lru_cache(maxsize=1)
 def get_gpu_name():
@@ -202,8 +222,21 @@ def test_serialization(segments):
     except Exception as e:
         print(f"所有字段一起序列化失败: {str(e)}")
 
+def remove_generators(obj):
+    if isinstance(obj, dict):
+        return {k: remove_generators(v) for k, v in obj.items() 
+                if not inspect.isgenerator(v)}
+    elif isinstance(obj, list):
+        return [remove_generators(item) for item in obj]
+    elif inspect.isgenerator(obj):
+        return None  # 或者返回一个空列表 []，取决于你的需求
+    else:
+        return obj
 
 
+@app.post("/ping")
+async def ping():
+    return {"message": "pong", "time": time.time()}
 
 
 @app.post("/v1/audio/transcriptions")
@@ -216,6 +249,8 @@ async def transcriptions(
     authorization: Annotated[str , Header()] = "",
 ):
     # assert model == "whisper-1"
+    stime = time.time()
+    print("[transcript] %0.6f 开始处理 HTTP 请求" % (time.time() - stime))
 
     # 进行认证检查
     # 获取 Authorization 头
@@ -259,7 +294,8 @@ async def transcriptions(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 签名不正确"
             )
-        
+
+    print("[transcript] %0.6f 认证检查完成" % (time.time() - stime))
 
     if file is None:
         raise HTTPException(
@@ -282,14 +318,21 @@ async def transcriptions(
             detail="Bad Request, bad temperature",
         )
 
+    # print("[transcript] %0.6f 参数检查完成" % (time.time() - stime))
+
     filename = file.filename
     fileobj = file.file
     upload_name = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(UPLOAD_DIR):
         os.makedirs(UPLOAD_DIR)
 
+    # print("[transcript] %0.6f 上传目录初始化完成" % (time.time() - stime))
+
+
     with open(upload_name, "wb+") as upload_file:
         shutil.copyfileobj(fileobj, upload_file)
+
+    # print("[transcript] %0.6f 上传文件复制完成" % (time.time() - stime))
 
     whisper_args = WHISPER_DEFAULT_SETTINGS.copy()
     if settings_override is not None:
@@ -300,18 +343,30 @@ async def transcriptions(
     # return transcript
 
     # faster_whisper
+    # print("[transcript] %0.6f 准备开始进行 faster_transcribe 推理" % (time.time() - stime))
     result = faster_transcribe(audio_path=upload_name)
-    stime = time.time()
+    # print("[transcript] %0.6f faster_transcribe 推理完成" % (time.time() - stime))
+
+    # print("[transcript] %0.6f 准备开始测试序列化速度" % (time.time() - stime))
+    # test_serialization(result['segments'])
+    # print("[transcript] %0.6f 序列化速度测试完成" % (time.time() - stime))
+
+    
+    # stime = time.time()
+    print("[transcript] %0.6f 准备开始删除生成器" % (time.time() - stime))
+    result_without_iterables = remove_generators(result)
+    print("[transcript] %0.6f 删除生成器完成" % (time.time() - stime))
+
+    # print("[transcript] %0.6f 准备开始序列化" % (time.time() - stime))
     resultJ = json.dumps(
-        result,
-        iterable_as_array = True,
+        result_without_iterables,
         ensure_ascii = False,
         ignore_nan = True,
         indent = None,
         separators = (',', ':'),
-        cls = CustomJSONEncoder,
     ).encode("utf-8")
-    # print("序列化耗时: %0.3f 秒" % (time.time() - stime))
+
+    # print("[transcript] %0.6f 序列化完成" % (time.time() - stime))
 
 
                          
