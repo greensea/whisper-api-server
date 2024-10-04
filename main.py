@@ -234,6 +234,13 @@ def remove_generators(obj):
         return obj
 
 
+
+stime = time.time()
+print("开始预加载模型")
+get_faster_whisper_model(MODEL_NAME)
+print("预加载模型完成，耗时 %0.3f 秒" % (time.time() - stime))
+
+
 @app.post("/ping")
 async def ping():
     return {"message": "pong", "time": time.time()}
