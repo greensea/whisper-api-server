@@ -159,7 +159,8 @@ def faster_transcribe(audio_path :str):
             language=None,
             initial_prompt=None,
         )
-        print("推理耗时 %0.3f 秒，输入语音长度 %0.3f 秒，猜测语言 %s（概率 %0.3f)" % (time.time() - stime, info.duration, info.language, info.language_probability))
+        inference_time_1 = time.time() - stime
+        
         # print("本次识别到的文字: %s" % segments)
         # debugSegments = copy.deepcopy(segments)
         # for s in debugSegments:
@@ -172,23 +173,29 @@ def faster_transcribe(audio_path :str):
         print("本次没有识别到文字: %s" % str(e))
         return []
 
-    # test_serialization(segments)
+
+    # 注意，segments 是一个 generator，在获取的时候似乎仍需要调用神经网络进行处理，所以这里也计算一下推理时间
+    stime2 = time.time()
+    segments = list(segments)
+    inference_time_2 = time.time() - stime2
+
+    inference_time = time.time() - stime
+
+    print("推理耗时 %0.3f + %0.3f = %0.3f 秒，输入语音长度 %0.3f 秒，猜测语言 %s（概率 %0.3f)" % (inference_time_1, inference_time_2, inference_time_1 + inference_time_2, info.duration, info.language, info.language_probability))
 
     return {
         "segments": segments,
         "info": info,
-        "inference_time": time.time() - stime,
+        "inference_time": inference_time,
+        "inference_time_1": inference_time_1,
+        "inference_time_2": inference_time_2,
         "gpus": get_gpu_name(),
-    }   
+    }
 
 def test_serialization(segments):
     # 在其他代码之前添加这些行
-    sample_segment = next(iter(segments), None)
-    if sample_segment:
-        print(f"'start' 字段的类型: {type(sample_segment.start)}")
-        print(f"'start' 字段的值: {sample_segment.start}")
 
-    fields = ['start', 'end', 'text', 'words', 'tokens', 'avg_logprob', 'compression_ratio', 'no_speech_prob']
+    fields = ['id', 'seek', 'start', 'end', 'text', 'tokens', 'temperature', 'avg_logprob', 'compression_ratio', 'no_speech_prob', 'words']
     
     for field in fields:
         start_time = time.time()
@@ -197,6 +204,7 @@ def test_serialization(segments):
                 [{field: getattr(segment, field, None)} for segment in segments], 
                 ensure_ascii = False,
                 ignore_nan = True,
+                iterable_as_array = True,
                 indent = None,
                 separators = (',', ':'),
                 cls = CustomJSONEncoder,
@@ -213,6 +221,7 @@ def test_serialization(segments):
             [{f: getattr(segment, f, None) for f in fields} for segment in segments], 
             ensure_ascii = False,
             ignore_nan = True,
+            iterable_as_array = True,
             indent = None,
             separators = (',', ':'),
             cls = CustomJSONEncoder,
@@ -302,7 +311,7 @@ async def transcriptions(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized, 签名不正确"
             )
 
-    print("[transcript] %0.6f 认证检查完成" % (time.time() - stime))
+    # print("[transcript] %0.6f 认证检查完成" % (time.time() - stime))
 
     if file is None:
         raise HTTPException(
@@ -360,13 +369,11 @@ async def transcriptions(
 
     
     # stime = time.time()
-    print("[transcript] %0.6f 准备开始删除生成器" % (time.time() - stime))
-    result_without_iterables = remove_generators(result)
-    print("[transcript] %0.6f 删除生成器完成" % (time.time() - stime))
 
     # print("[transcript] %0.6f 准备开始序列化" % (time.time() - stime))
     resultJ = json.dumps(
-        result_without_iterables,
+        result,
+        iterable_as_array = True,
         ensure_ascii = False,
         ignore_nan = True,
         indent = None,
