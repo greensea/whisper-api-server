@@ -117,6 +117,10 @@ def get_faster_whisper_model(whisper_model: str):
 
     return model
 
+@lru_cache(maxsize=1)
+def get_hostname() -> str:
+    import socket
+    return socket.gethostname()
 
 def transcribe(audio_path: str, whisper_model: str, **whisper_args):
     """Transcribe the audio file using whisper"""
@@ -190,6 +194,7 @@ def faster_transcribe(audio_path :str):
         "inference_time_1": inference_time_1,
         "inference_time_2": inference_time_2,
         "gpus": get_gpu_name(),
+        "hostname": get_hostname(),
     }
 
 def test_serialization(segments):
