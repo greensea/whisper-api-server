@@ -3,6 +3,7 @@ Based on https://github.com/morioka/tiny-openai-whisper-api
 """
 
 UPLOAD_DIR = "tmp"
+MODEL_PATH = "./faster-whisper-large-v3"
 
 import time
 
@@ -67,15 +68,6 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 # 开始初始化服务器配置
 stime = time.time()
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # from pyinstrument import Profiler
 # from fastapi import Request
@@ -111,7 +103,7 @@ def get_whisper_model(whisper_model: str):
     return model
 
 @lru_cache(maxsize=1)
-def get_faster_whisper_model(model_size_or_path = MODEL_NAME, device = "cuda"):
+def get_faster_whisper_model(model_size_or_path = MODEL_PATH, device = "cuda"):
     """Get a whisper model from the cache or download it if it doesn't exist"""
     # model_size = MODEL_NAME
     if device == "cuda":
@@ -159,7 +151,7 @@ def transcribe(audio_path: str, whisper_model: str, **whisper_args):
 
 
 def faster_transcribe(audio_path :str):
-    model = get_faster_whisper_model()
+    model = get_faster_whisper_model(MODEL_PATH)
     try:
         stime = time.time()
         segments, info = model.transcribe(
@@ -258,8 +250,23 @@ def remove_generators(obj):
 
 stime = time.time()
 print("开始预加载模型")
-get_faster_whisper_model(MODEL_NAME)
+get_faster_whisper_model(MODEL_PATH)
 print("预加载模型完成，耗时 %0.3f 秒" % (time.time() - stime))
+
+
+print("开始启动 Web 服务")
+stime = time.time()
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+print("Web 服务启动完成，耗时 %0.3f 秒" % (time.time() - stime))
+
 
 
 @app.post("/ping")
