@@ -4,3 +4,4 @@ __pycache__
 tmp/
 .idea/
 .cache/
+whisper-v3-large.model
