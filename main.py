@@ -4,6 +4,11 @@ Based on https://github.com/morioka/tiny-openai-whisper-api
 
 UPLOAD_DIR = "tmp"
 
+import time
+
+print("开始加载各种库")
+stime = time.time()
+
 import os
 import shutil
 from datetime import timedelta
@@ -23,10 +28,8 @@ import faster_whisper
 from fastapi import FastAPI, Form, UploadFile, File, Header, Response
 from fastapi import HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-import time
-import inspect
 
-
+print("各种库加载完毕，耗时: %0.3f 秒" % (time.time() - stime))
 
 
 
@@ -63,8 +66,7 @@ class CustomJSONEncoder(json.JSONEncoder):
 
 
 # 开始初始化服务器配置
-
-
+stime = time.time()
 app = FastAPI()
 
 app.add_middleware(
@@ -109,11 +111,16 @@ def get_whisper_model(whisper_model: str):
     return model
 
 @lru_cache(maxsize=1)
-def get_faster_whisper_model(whisper_model: str):
+def get_faster_whisper_model(model_size_or_path = MODEL_NAME, device = "cuda"):
     """Get a whisper model from the cache or download it if it doesn't exist"""
-    model_size = MODEL_NAME
-    device, compute_type = "cuda", "float16"
-    model = faster_whisper.WhisperModel(model_size, device=device, compute_type=compute_type)
+    # model_size = MODEL_NAME
+    if device == "cuda":
+        print("使用 GPU 设备")
+        device, compute_type = "cuda", "float16"
+    else:
+        print("使用 CPU 设备")
+        device, compute_type = "cpu", "int8"
+    model = faster_whisper.WhisperModel(model_size_or_path, device=device, compute_type=compute_type)
 
     return model
 
@@ -152,7 +159,7 @@ def transcribe(audio_path: str, whisper_model: str, **whisper_args):
 
 
 def faster_transcribe(audio_path :str):
-    model = get_faster_whisper_model(MODEL_NAME)
+    model = get_faster_whisper_model()
     try:
         stime = time.time()
         segments, info = model.transcribe(
@@ -259,6 +266,9 @@ print("预加载模型完成，耗时 %0.3f 秒" % (time.time() - stime))
 async def ping():
     return {"message": "pong", "time": time.time()}
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "time": time.time()}
 
 @app.post("/v1/audio/transcriptions")
 async def transcriptions(
