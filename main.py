@@ -445,4 +445,6 @@ async def transcriptions(
 
 
 if __name__ == "__main__":
+    print("开始执行 __main__ 代码块")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("__main__ 代码块执行完毕")
