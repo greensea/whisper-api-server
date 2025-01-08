@@ -111,7 +111,7 @@ def get_whisper_model(whisper_model: str):
     return model
 
 @lru_cache(maxsize=2)
-def get_faster_whisper_model(model_name = "", device = "cpu"):
+def get_faster_whisper_model(model_name = "", device = "cuda"):
     """Get a whisper model from the cache or download it if it doesn't exist"""
     # model_size = MODEL_NAME
     if device == "cuda":
