@@ -3,8 +3,13 @@ Based on https://github.com/morioka/tiny-openai-whisper-api
 """
 
 UPLOAD_DIR = "tmp"
-MODEL_PATH = "./faster-whisper-large-v3"
+# MODEL_PATH = "./faster-whisper-large-v3"
+# MODEL_PATH = "/data/git/faster-whisper-large-v3"
+# MODEL_PATH = "deepdml/faster-whisper-large-v3-turbo-ct2"
 
+MODELS = ["faster-whisper-large-v3", "faster-whisper-large-v3-turbo-ct2"]
+
+import print_with_time
 import time
 
 print("开始加载各种库")
@@ -36,20 +41,20 @@ print("各种库加载完毕，耗时: %0.3f 秒" % (time.time() - stime))
 
 # 开始基础配置
 
-MODEL_NAME = "large-v3"
+# MODEL_NAME = "large-v3"
 
-WHISPER_DEFAULT_SETTINGS = {
-    #"whisper_model": "base",
-    "whisper_model": MODEL_NAME,
-    "temperature": 0.0,
-    "temperature_increment_on_fallback": 0.2,
-    "no_speech_threshold": 0.6,
-    "logprob_threshold": -1.0,
-    "compression_ratio_threshold": 2.4,
-    "condition_on_previous_text": True,
-    "verbose": False,
-    "task": "transcribe",
-}
+# WHISPER_DEFAULT_SETTINGS = {
+#     #"whisper_model": "base",
+#     "whisper_model": MODEL_NAME,
+#     "temperature": 0.0,
+#     "temperature_increment_on_fallback": 0.2,
+#     "no_speech_threshold": 0.6,
+#     "logprob_threshold": -1.0,
+#     "compression_ratio_threshold": 2.4,
+#     "condition_on_previous_text": True,
+#     "verbose": False,
+#     "task": "transcribe",
+# }
 
 
 # 开始初始各种类重载
@@ -87,32 +92,36 @@ stime = time.time()
 
 @lru_cache(maxsize=1)
 def get_gpu_name():
-    nvmlInit()
-    ret = []
-    for i in range(nvmlDeviceGetCount()):
-        handle = nvmlDeviceGetHandleByIndex(i)
-        ret.append(nvmlDeviceGetName(handle))
-    nvmlShutdown()
-    return ret
+    try:
+        nvmlInit()
+        ret = []
+        for i in range(nvmlDeviceGetCount()):
+            handle = nvmlDeviceGetHandleByIndex(i)
+            ret.append(nvmlDeviceGetName(handle))
+        nvmlShutdown()
+        return ret
+    except:
+        return "cpu"
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=2)
 def get_whisper_model(whisper_model: str):
     """Get a whisper model from the cache or download it if it doesn't exist"""
     model = whisper.load_model(whisper_model)
 
     return model
 
-@lru_cache(maxsize=1)
-def get_faster_whisper_model(model_size_or_path = MODEL_PATH, device = "cuda"):
+@lru_cache(maxsize=2)
+def get_faster_whisper_model(model_name = "", device = "cpu"):
     """Get a whisper model from the cache or download it if it doesn't exist"""
     # model_size = MODEL_NAME
     if device == "cuda":
-        print("使用 GPU 设备")
+        print("使用 GPU 设备加载模型 %s" % model_name)
         device, compute_type = "cuda", "float16"
     else:
-        print("使用 CPU 设备")
+        print("使用 CPU 设备加载模型 %s" % model_name)
         device, compute_type = "cpu", "int8"
-    model = faster_whisper.WhisperModel(model_size_or_path, device=device, compute_type=compute_type)
+
+    model = faster_whisper.WhisperModel("/data/git/" + model_name, device=device, compute_type=compute_type)
 
     return model
 
@@ -121,37 +130,11 @@ def get_hostname() -> str:
     import socket
     return socket.gethostname()
 
-def transcribe(audio_path: str, whisper_model: str, **whisper_args):
-    """Transcribe the audio file using whisper"""
-
-    # Get whisper model
-    # NOTE: If multiple models are selected, this may keep all of them in memory depending on the cache size
-    transcriber = get_whisper_model(whisper_model)
-
-    # Set configs & transcribe
-    if whisper_args["temperature_increment_on_fallback"] is not None:
-        whisper_args["temperature"] = tuple(
-            np.arange(
-                whisper_args["temperature"],
-                1.0 + 1e-6,
-                whisper_args["temperature_increment_on_fallback"],
-            )
-        )
-    else:
-        whisper_args["temperature"] = [whisper_args["temperature"]]
-
-    del whisper_args["temperature_increment_on_fallback"]
-
-    transcript = transcriber.transcribe(
-        audio_path,
-        **whisper_args,
-    )
-
-    return transcript
 
 
-def faster_transcribe(audio_path :str):
-    model = get_faster_whisper_model(MODEL_PATH)
+
+def faster_transcribe(model_name: str, audio_path :str):
+    model = get_faster_whisper_model(model_name)
     try:
         stime = time.time()
         segments, info = model.transcribe(
@@ -188,12 +171,13 @@ def faster_transcribe(audio_path :str):
 
     return {
         "segments": segments,
-        "info": info,
+        # "info": info,
         "inference_time": inference_time,
         "inference_time_1": inference_time_1,
         "inference_time_2": inference_time_2,
         "gpus": get_gpu_name(),
         "hostname": get_hostname(),
+        "model_name": model_name,
     }
 
 def test_serialization(segments):
@@ -248,10 +232,22 @@ def remove_generators(obj):
 
 
 
-stime = time.time()
+
 print("开始预加载模型")
-get_faster_whisper_model(MODEL_PATH)
-print("预加载模型完成，耗时 %0.3f 秒" % (time.time() - stime))
+stime = time.time()
+for m in MODELS:
+    t2 = time.time()
+    get_faster_whisper_model(m)
+    print("预加载模型 %s 完成，耗时 %0.3f 秒" % (m, time.time() - t2))
+print("所有模型预加载完成，耗时 %0.3f 秒" % (time.time() - stime))
+
+print("开始预热模型")
+stime = time.time()
+for m in MODELS:
+    t2 = time.time()
+    get_faster_whisper_model(m).transcribe("./nihao.wav")
+    print("预热模型 %s 完成，耗时 %0.3f 秒" % (m, time.time() - t2))
+print("所有模型预热完成，耗时 %0.3f 秒" % (time.time() - stime))
 
 
 print("开始启动 Web 服务")
@@ -268,6 +264,16 @@ app.add_middleware(
 print("Web 服务启动完成，耗时 %0.3f 秒" % (time.time() - stime))
 
 
+@app.get("/")
+async def index():
+    ret = """kiwi 语音识别服务器
+# 当前支持的模型
+%s
+
+请在 /v1/audio/transcriptions 接口中使用 model 参数指定模型
+默认模型为 %s
+""" % ("\n".join(["* %s" % m for m in MODELS]), MODELS[0])
+    return ret
 
 @app.post("/ping")
 async def ping():
@@ -285,8 +291,19 @@ async def transcriptions(
     temperature: Optional[float] = Form(None),
     settings_override: Optional[dict] = Form(None),
     authorization: Annotated[str , Header()] = "",
+    model: Optional[str] = Form(""),
 ):
-    # assert model == "whisper-1"
+
+    model_name = model
+    if model_name not in MODELS:
+        if model_name == "":
+            print("未指定模型，将使用默认模型 %s" % MODELS[0])
+        else:
+            print("指定的模型 %s 不存在，将使用默认模型 %s" % (model_name, MODELS[0]))
+        model_name = MODELS[0]
+    else:
+        print("将使用 %s 模型进行推理" % model_name)
+
     stime = time.time()
     print("[transcript] %0.6f 开始处理 HTTP 请求" % (time.time() - stime))
 
@@ -372,9 +389,9 @@ async def transcriptions(
 
     # print("[transcript] %0.6f 上传文件复制完成" % (time.time() - stime))
 
-    whisper_args = WHISPER_DEFAULT_SETTINGS.copy()
-    if settings_override is not None:
-        whisper_args.update(settings_override)
+    # whisper_args = WHISPER_DEFAULT_SETTINGS.copy()
+    # if settings_override is not None:
+    #     whisper_args.update(settings_override)
 
     # 普通 whisper
     # transcript = transcribe(audio_path=upload_name, **whisper_args)
@@ -382,7 +399,7 @@ async def transcriptions(
 
     # faster_whisper
     # print("[transcript] %0.6f 准备开始进行 faster_transcribe 推理" % (time.time() - stime))
-    result = faster_transcribe(audio_path=upload_name)
+    result = faster_transcribe(model_name=model_name, audio_path=upload_name)
     # print("[transcript] %0.6f faster_transcribe 推理完成" % (time.time() - stime))
 
     # print("[transcript] %0.6f 准备开始测试序列化速度" % (time.time() - stime))
